@@ -8,22 +8,58 @@
 //
 
 typedef struct __rwlock_t {
+pthread_mutex_t lock;
+pthread_cond_t clear;
+int readers;
+int writelock;
 } rwlock_t;
 
 
 void rwlock_init(rwlock_t *rw) {
+	rw->readers = 0;
+	rw->writelock = 0;
+	pthread_mutex_init(&rw->lock, NULL);
+	pthread_cond_init(&rw->clear, NULL);
 }
 
 void rwlock_acquire_readlock(rwlock_t *rw) {
+	pthread_muyex_lock(&rw->lock);
+	while (rw->writelock > 0) {
+		pthread_cond_wait(&rw->clear, &rw->lock);
+	}
+	rw->readers++;
+	pthread_mutex_unlock(&rw->lock);
+
+	sleep(1);
 }
 
 void rwlock_release_readlock(rwlock_t *rw) {
+	pthread_mutex_lock(&rw->lock);
+	rw->readers++;
+
+	if (rw->readers==0){
+		pthread_cond_broadcast(&rw->clear);
+	}
+	pthread_mutex_unlock(&rw->lock);
 }
 
 void rwlock_acquire_writelock(rwlock_t *rw) {
+	pthread_mutex_lock(&rw->lock);
+	while (rw->writelock > 0 || rw->readers > 0){
+		pthread_cond_wait(&rw->clear, &rw->lock);
+}
+rw->writelock = 1;
+pthread_mutex_unlock(&rw->lock);
+
+sleep(1);
 }
 
 void rwlock_release_writelock(rwlock_t *rw) {
+	pthread_mutex_lock(&rw->lock);
+	rw->writelock = 0;
+
+	pthread_cond_broadcast(&rw->clear);
+	pthread_mutex_unlock(&rw->lock);
 }
 
 //
